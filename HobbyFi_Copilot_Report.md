@@ -1,6 +1,6 @@
 
 # HobbyFi Copilot: AI-CRM Assistant for Vendor Portal
-### AI Engineer Intern Assessment — Submitted by Paras Sharma
+### AI Engineer Intern Assessment | Submitted by Paras Sharma
 
 ---
 
