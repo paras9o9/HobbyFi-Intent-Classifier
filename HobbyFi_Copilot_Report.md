@@ -6,15 +6,15 @@
 
 ## 1. Architecture Overview
 
-The HobbyFi Copilot is designed as a **router-based multi-agent system** rather than a single monolithic agent, since vendor queries span two fundamentally different risk profiles: read-only information retrieval and write operations that mutate CRM data. Separating these into distinct agents backed by typed, scoped tools ensures the LLM decides *what* the vendor wants, while deterministic code decides *how* it is executed — a critical safety property given the requirement that "write access is only executed on vendor approval."
+The HobbyFi Copilot is designed as a **router-based multi-agent system** rather than a single monolithic agent, since vendor queries span two fundamentally different risk profiles: read-only information retrieval and write operations that mutate CRM data. Separating these into distinct agents backed by typed, scoped tools ensures the LLM decides *what* the vendor wants, while deterministic code decides *how* it is executed, a critical safety property given the requirement that "write access is only executed on vendor approval."
 
 **Core components:**
 
-- **Intent Router Agent** — Classifies incoming vendor queries into READ or WRITE, and further into specific sub-intents (e.g., `read_revenue`, `read_trial_users`, `write_extend_trial`). This layer combines a lightweight ML classifier (TF-IDF + LinearSVC, calibrated) with LLM-based entity extraction for parameters like `vendor_id`, `sport`, `date_range`, and `user_id`.
-- **Query Agent (read-only)** — Invokes scoped tools such as `getRevenue(vendorId, dateRange)` or `listTrialUsers(vendorId, sport)` against read-optimized views, always injecting `vendor_id` from the authenticated session rather than trusting it from the LLM output.
-- **Action Agent (write)** — Builds a structured change payload (e.g., `updateMembershipDate`, `extendTrial`, `cancelSubscription`) but never executes directly. It hands the payload to a workflow that requires explicit vendor approval before execution.
-- **Guardrail Layer** — Sits between LLM output and tool execution, validating scope, business rules, and confidence thresholds before any action proceeds.
-- **Response Formatter** — Converts raw tool outputs into natural, concise vendor-facing language, citing record counts/IDs where relevant.
+- **Intent Router Agent:** Classifies incoming vendor queries into READ or WRITE, and further into specific sub-intents (e.g., `read_revenue`, `read_trial_users`, `write_extend_trial`). This layer combines a lightweight ML classifier (TF-IDF + LinearSVC, calibrated) with LLM-based entity extraction for parameters like `vendor_id`, `sport`, `date_range`, and `user_id`.
+- **Query Agent (read-only):** Invokes scoped tools such as `getRevenue(vendorId, dateRange)` or `listTrialUsers(vendorId, sport)` against read-optimized views, always injecting `vendor_id` from the authenticated session rather than trusting it from the LLM output.
+- **Action Agent (write):** Builds a structured change payload (e.g., `updateMembershipDate`, `extendTrial`, `cancelSubscription`) but never executes directly. It hands the payload to a workflow that requires explicit vendor approval before execution.
+- **Guardrail Layer:** Sits between LLM output and tool execution, validating scope, business rules, and confidence thresholds before any action proceeds.
+- **Response Formatter:** Converts raw tool outputs into natural, concise vendor-facing language, citing record counts/IDs where relevant.
 
 **High-level flow:**
 
@@ -23,7 +23,7 @@ Vendor Query → Intent Router Agent → [READ path] → Query Agent → Tool Ca
                                     → [WRITE path] → Action Agent → Guardrail Checks → Approval Workflow (suspend) → Vendor Approves → Tool Execution → Audit Log → Response
 ```
 
-This design keeps the LLM's role narrow (intent understanding, entity extraction, natural language generation) while all business-critical logic — data access, mutation, and approval — remains in code, which is easier to test, audit, and reason about than a single agent generating and executing SQL directly.
+This design keeps the LLM's role narrow (intent understanding, entity extraction, natural language generation) while all business-critical logic, data access, mutation, and approval, remains in code, which is easier to test, audit, and reason about than a single agent generating and executing SQL directly.
 
 ---
 
@@ -40,7 +40,7 @@ Since HobbyFi has standardized on **Mastra**, the architecture is built natively
 | Primary data store | PostgreSQL (mock CRM schema) | Relational integrity for vendors, users, memberships, and transactions |
 | Observability | Mastra Studio / built-in tracing | Inspect agent runs, memory state, and tool calls during development and demos |
 
-**Why not LangChain/LlamaIndex:** Mastra already ships RAG, memory, and workflow primitives comparable to these frameworks. Stacking an additional framework on top would duplicate functionality and increase maintenance surface without a corresponding capability gain — a deliberate simplicity choice, not an oversight.
+**Why not LangChain/LlamaIndex:** Mastra already ships RAG, memory, and workflow primitives comparable to these frameworks. Stacking an additional framework on top would duplicate functionality and increase maintenance surface without a corresponding capability gain, a deliberate simplicity choice, not an oversight.
 
 **Mock Data Schema** (used to ground tool definitions and guardrail logic):
 
@@ -51,7 +51,7 @@ Since HobbyFi has standardized on **Mastra**, the architecture is built natively
 - `transactions(txn_id, vendor_id, user_id, amount, date)`
 - `audit_log(action_id, vendor_id, actor, action_type, payload, approved_by, timestamp)`
 
-Every tool takes `vendor_id` as a mandatory, session-injected parameter — never an LLM-controlled field — which is the first layer of defense against cross-tenant data leakage.
+Every tool takes `vendor_id` as a mandatory, session-injected parameter, never an LLM-controlled field, which is the first layer of defense against cross-tenant data leakage.
 
 ---
 
@@ -70,14 +70,14 @@ This layered approach balances conversational continuity (which vendors expect f
 
 ## 4. Guardrails Framework
 
-Guardrails are organized into three layers — input, execution, and output — mapping directly to where risk enters the system.
+Guardrails are organized into three layers — input, execution, and output, mapping directly to where risk enters the system.
 
 **Input validation:**
 - Reject or flag cross-vendor access attempts (e.g., "show me vendor Y's revenue") via a scope check before the LLM reasons about the query.
 - An intent-classification confidence gate: queries are pre-classified using a calibrated TF-IDF + LinearSVC model; if confidence falls below a tuned threshold, the system responds with a clarification request instead of guessing the intent.
 
 **Execution validation (business rules):**
-- Hard-coded constraints enforced in code, not left to LLM judgment — e.g., trial extensions capped at 30 days, membership dates cannot be backdated.
+- Hard-coded constraints enforced in code, not left to LLM judgment e.g., trial extensions capped at 30 days, membership dates cannot be backdated.
 - Human-in-the-loop for all writes: every write action generates a diff/preview (e.g., "Extend trial for user Alex from 7 to 14 days — approve?") and executes only after explicit vendor confirmation.
 
 **Output guardrails:**
@@ -97,7 +97,7 @@ This experiment demonstrates that "guardrails" in this system are not just promp
 
 ## 5. Workflow Orchestration
 
-Write operations are modeled as a **Mastra Workflow with a suspend/resume step**, since a write action cannot complete within a single conversational turn — it must pause for vendor approval and resume upon confirmation.
+Write operations are modeled as a **Mastra Workflow with a suspend/resume step**, since a write action cannot complete within a single conversational turn, it must pause for vendor approval and resume upon confirmation.
 
 **Workflow steps:**
 
@@ -107,7 +107,7 @@ Write operations are modeled as a **Mastra Workflow with a suspend/resume step**
 4. Vendor approves or rejects the action via the portal UI; the workflow **resumes** based on this signal.
 5. On approval: execute the tool call, write an entry to `audit_log`, and respond with confirmation. On rejection: discard the payload and respond accordingly, with no data mutation.
 
-This suspend/resume pattern is a first-class primitive in Mastra workflows, and using it explicitly (rather than simulating approval with ad-hoc prompt engineering) ensures the approval gate is enforced structurally, not just suggested to the LLM — making it far harder to bypass through prompt injection or unusual phrasing.
+This suspend/resume pattern is a first-class primitive in Mastra workflows, and using it explicitly (rather than simulating approval with ad-hoc prompt engineering) ensures the approval gate is enforced structurally, not just suggested to the LLM, making it far harder to bypass through prompt injection or unusual phrasing.
 
 ---
 
